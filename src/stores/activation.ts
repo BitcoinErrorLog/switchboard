@@ -1,8 +1,14 @@
 import { create } from 'zustand'
 import type { Session } from '@synonymdev/pubky'
 
+export type ActivationMode = 'new' | 'existing'
+export type MergeStrategy = 'full' | 'additive' | 'link_only'
+
 export type ActivationStep =
   | 'idle'
+  | 'choosing_mode'
+  | 'authenticating'
+  | 'choosing_merge'
   | 'generating_keypair'
   | 'backup_mnemonic'
   | 'signing_up'
@@ -14,6 +20,8 @@ export type ActivationStep =
   | 'error'
 
 interface ActivationState {
+  mode: ActivationMode | null
+  mergeStrategy: MergeStrategy
   step: ActivationStep
   mnemonic: string | null
   pubkyId: string | null
@@ -27,9 +35,12 @@ interface ActivationState {
   totalTags: number
   error: string | null
 
+  setMode: (mode: ActivationMode) => void
+  setMergeStrategy: (strategy: MergeStrategy) => void
   setStep: (step: ActivationStep) => void
   setKeypair: (mnemonic: string, pubkyId: string) => void
   setSession: (session: Session) => void
+  setExistingSession: (session: Session, pubkyId: string) => void
   setProfileWritten: () => void
   incrementFollows: () => void
   incrementPosts: () => void
@@ -40,6 +51,8 @@ interface ActivationState {
 }
 
 const initialState = {
+  mode: null as ActivationMode | null,
+  mergeStrategy: 'full' as MergeStrategy,
   step: 'idle' as ActivationStep,
   mnemonic: null,
   pubkyId: null,
@@ -57,9 +70,12 @@ const initialState = {
 export const useActivationStore = create<ActivationState>((set) => ({
   ...initialState,
 
+  setMode: (mode) => set({ mode }),
+  setMergeStrategy: (strategy) => set({ mergeStrategy: strategy }),
   setStep: (step) => set({ step }),
   setKeypair: (mnemonic, pubkyId) => set({ mnemonic, pubkyId }),
   setSession: (session) => set({ session }),
+  setExistingSession: (session, pubkyId) => set({ session, pubkyId }),
   setProfileWritten: () => set({ profileWritten: true }),
   incrementFollows: () => set((s) => ({ followsWritten: s.followsWritten + 1 })),
   incrementPosts: () => set((s) => ({ postsWritten: s.postsWritten + 1 })),

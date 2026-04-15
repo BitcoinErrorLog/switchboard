@@ -72,10 +72,10 @@ export default function Preview() {
             Re-import
           </Link>
           <button
-            onClick={() => navigate(`/${platform}/verify`)}
+            onClick={() => navigate(`/${platform}/activate`)}
             className="flex-1 rounded-xl bg-pubky px-6 py-4 font-semibold text-white transition-colors hover:bg-pubky-dark"
           >
-            Continue to Verification
+            Continue
           </button>
         </div>
       </div>

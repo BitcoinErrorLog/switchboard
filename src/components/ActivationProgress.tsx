@@ -2,6 +2,9 @@ import { useActivationStore, type ActivationStep } from '@/stores/activation'
 
 const STEP_LABELS: Record<ActivationStep, string> = {
   idle: 'Ready',
+  choosing_mode: 'Choose account type',
+  authenticating: 'Authenticating with Pubky Ring…',
+  choosing_merge: 'Choose merge strategy',
   generating_keypair: 'Generating keypair…',
   backup_mnemonic: 'Back up your recovery phrase',
   signing_up: 'Creating Pubky account…',
@@ -13,49 +16,92 @@ const STEP_LABELS: Record<ActivationStep, string> = {
   error: 'Error',
 }
 
-function isActiveOrPast(current: ActivationStep, target: ActivationStep): boolean {
-  const order: ActivationStep[] = [
-    'idle',
-    'generating_keypair',
-    'backup_mnemonic',
-    'signing_up',
-    'writing_profile',
-    'writing_follows',
-    'writing_posts',
-    'writing_tags',
-    'complete',
-  ]
+const NEW_ACCOUNT_ORDER: ActivationStep[] = [
+  'idle',
+  'generating_keypair',
+  'backup_mnemonic',
+  'signing_up',
+  'writing_profile',
+  'writing_follows',
+  'writing_posts',
+  'writing_tags',
+  'complete',
+]
+
+const EXISTING_ACCOUNT_ORDER: ActivationStep[] = [
+  'idle',
+  'authenticating',
+  'choosing_merge',
+  'writing_profile',
+  'writing_follows',
+  'writing_posts',
+  'writing_tags',
+  'complete',
+]
+
+function isActiveOrPast(current: ActivationStep, target: ActivationStep, order: ActivationStep[]): boolean {
   return order.indexOf(current) >= order.indexOf(target)
 }
 
 export default function ActivationProgress() {
-  const { step, profileWritten, followsWritten, totalFollows, postsWritten, totalPosts, tagsWritten, totalTags } = useActivationStore()
+  const { step, mode, mergeStrategy, profileWritten, followsWritten, totalFollows, postsWritten, totalPosts, tagsWritten, totalTags } = useActivationStore()
+
+  const order = mode === 'existing' ? EXISTING_ACCOUNT_ORDER : NEW_ACCOUNT_ORDER
 
   const writeSteps: Array<{
     key: ActivationStep
     label: string
     progress?: string
-  }> = [
-    { key: 'generating_keypair', label: 'Generate keypair' },
-    { key: 'backup_mnemonic', label: 'Backup recovery phrase' },
-    { key: 'signing_up', label: 'Create account' },
-    { key: 'writing_profile', label: 'Write profile', progress: profileWritten ? '✓' : undefined },
-    {
-      key: 'writing_follows',
-      label: 'Write follows',
-      progress: totalFollows > 0 ? `${followsWritten}/${totalFollows}` : undefined,
-    },
-    {
-      key: 'writing_posts',
-      label: 'Write posts',
-      progress: totalPosts > 0 ? `${postsWritten}/${totalPosts}` : undefined,
-    },
-    {
-      key: 'writing_tags',
-      label: 'Write tags',
-      progress: totalTags > 0 ? `${tagsWritten}/${totalTags}` : undefined,
-    },
-  ]
+  }> = mode === 'existing'
+    ? [
+        { key: 'authenticating', label: 'Authenticate with Pubky Ring' },
+        { key: 'choosing_merge', label: 'Choose import strategy' },
+        ...(mergeStrategy !== 'link_only'
+          ? [
+              {
+                key: 'writing_profile' as ActivationStep,
+                label: mergeStrategy === 'additive' ? 'Skip profile (keep existing)' : 'Write profile',
+                progress: profileWritten ? '✓' : undefined,
+              },
+              {
+                key: 'writing_follows' as ActivationStep,
+                label: 'Write follows',
+                progress: totalFollows > 0 ? `${followsWritten}/${totalFollows}` : undefined,
+              },
+              {
+                key: 'writing_posts' as ActivationStep,
+                label: 'Write posts',
+                progress: totalPosts > 0 ? `${postsWritten}/${totalPosts}` : undefined,
+              },
+              {
+                key: 'writing_tags' as ActivationStep,
+                label: 'Write tags',
+                progress: totalTags > 0 ? `${tagsWritten}/${totalTags}` : undefined,
+              },
+            ]
+          : []),
+      ]
+    : [
+        { key: 'generating_keypair', label: 'Generate keypair' },
+        { key: 'backup_mnemonic', label: 'Backup recovery phrase' },
+        { key: 'signing_up', label: 'Create account' },
+        { key: 'writing_profile', label: 'Write profile', progress: profileWritten ? '✓' : undefined },
+        {
+          key: 'writing_follows',
+          label: 'Write follows',
+          progress: totalFollows > 0 ? `${followsWritten}/${totalFollows}` : undefined,
+        },
+        {
+          key: 'writing_posts',
+          label: 'Write posts',
+          progress: totalPosts > 0 ? `${postsWritten}/${totalPosts}` : undefined,
+        },
+        {
+          key: 'writing_tags',
+          label: 'Write tags',
+          progress: totalTags > 0 ? `${tagsWritten}/${totalTags}` : undefined,
+        },
+      ]
 
   return (
     <div className="space-y-2">
@@ -63,7 +109,7 @@ export default function ActivationProgress() {
       <div className="space-y-1.5">
         {writeSteps.map((ws) => {
           const isActive = step === ws.key
-          const isPast = isActiveOrPast(step, ws.key) && step !== ws.key
+          const isPast = isActiveOrPast(step, ws.key, order) && step !== ws.key
           return (
             <div
               key={ws.key}

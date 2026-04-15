@@ -2,6 +2,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useVerificationStore } from '@/stores/verification'
 import { useImportStore } from '@/stores/import'
+import { useActivationStore } from '@/stores/activation'
 import { checkSmsAvailability, checkLnAvailability } from '@/lib/homegate'
 import SmsVerification from '@/components/SmsVerification'
 import LnVerification from '@/components/LnVerification'
@@ -11,9 +12,17 @@ export default function Verify() {
   const navigate = useNavigate()
   const verification = useVerificationStore()
   const { identity } = useImportStore()
+  const activationMode = useActivationStore((s) => s.mode)
   const [smsAvailable, setSmsAvailable] = useState<boolean | null>(null)
   const [lnAvailable, setLnAvailable] = useState<boolean | null>(null)
   const [lnAmountSat, setLnAmountSat] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (activationMode === 'existing') {
+      navigate(`/${platform}/activate`)
+      return
+    }
+  }, [activationMode, platform, navigate])
 
   useEffect(() => {
     Promise.all([

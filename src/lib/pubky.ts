@@ -1,6 +1,9 @@
-import { Pubky, Keypair, PublicKey } from '@synonymdev/pubky'
-import type { Session } from '@synonymdev/pubky'
+import { Pubky, Keypair, PublicKey, AuthFlowKind } from '@synonymdev/pubky'
+import type { Session, AuthFlow, Capabilities } from '@synonymdev/pubky'
 import * as bip39 from 'bip39'
+
+export { AuthFlowKind }
+export type { AuthFlow }
 
 let pubkyInstance: Pubky | null = null
 
@@ -55,4 +58,33 @@ export async function writeJson(
 
 export function getPublicKey(session: Session): string {
   return session.info.publicKey.z32()
+}
+
+const SWITCHBOARD_CAPABILITIES: Capabilities = '/pub/pubky.app/:rw'
+
+export function startSigninFlow(): AuthFlow {
+  const pubky = getPubky()
+  const kind = AuthFlowKind.signin()
+  return pubky.startAuthFlow(SWITCHBOARD_CAPABILITIES, kind)
+}
+
+export async function signinWithAuthFlow(): Promise<{
+  session: Session
+  pubkyId: string
+  authorizationUrl: string
+  awaitApproval: () => Promise<{ session: Session; pubkyId: string }>
+}> {
+  const flow = startSigninFlow()
+  const authorizationUrl = flow.authorizationUrl
+
+  return {
+    session: null as unknown as Session,
+    pubkyId: '',
+    authorizationUrl,
+    awaitApproval: async () => {
+      const session = await flow.awaitApproval()
+      const pubkyId = getPublicKey(session)
+      return { session, pubkyId }
+    },
+  }
 }

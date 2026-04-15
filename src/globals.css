@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pubky: #6d5bff;
+  --color-pubky-light: #8b7dff;
+  --color-pubky-dark: #5243cc;
+  --color-nostr: #8b5cf6;
+  --color-bluesky: #0085ff;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}

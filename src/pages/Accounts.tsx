@@ -141,11 +141,11 @@ function NostrAccountCard({
               {account.identity.display_name || account.identity.external_id.slice(0, 16) + '...'}
             </span>
           </div>
-          {account.sessionData?.secretKeyHex && (
+          {account.sessionData?.secretKeyHex ? (
             <span className="inline-block rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
               Local key
             </span>
-          )}
+          ) : null}
           {account.lastSynced && (
             <p className="text-xs text-zinc-500">
               Last synced: {new Date(account.lastSynced).toLocaleString()}

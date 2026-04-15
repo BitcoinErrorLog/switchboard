@@ -6,7 +6,6 @@ import { hasNip07Extension, getNip07PublicKey, verifyOwnershipWithSecretKey } fr
 import { decodeNsec, setSecretKey, secretKeyToHex, clearSecretKey } from '@/adapters/nostr/signer'
 import { login as blueskyLogin, getSessionData as getBlueskySession } from '@/adapters/bluesky/client'
 import { parseProfile as parseBlueskyProfile } from '@/adapters/bluesky/parser'
-import { Agent } from '@atproto/api'
 
 export default function Accounts() {
   const { accounts, linkAccount, unlinkAccount } = useAccountsStore()
@@ -220,12 +219,11 @@ function BlueskyAccountCard({
     setLoading(true)
     setError(null)
     try {
-      await blueskyLogin({ identifier: handle.trim(), password: appPassword.trim() })
+      const authedAgent = await blueskyLogin({ identifier: handle.trim(), password: appPassword.trim() })
       const sessionData = getBlueskySession()
       if (!sessionData) throw new Error('No session')
 
-      const agent = new Agent('https://bsky.social')
-      const profileRes = await agent.getProfile({ actor: sessionData.did })
+      const profileRes = await authedAgent.getProfile({ actor: sessionData.did })
       const identity = parseBlueskyProfile(profileRes.data, true)
 
       onLink({

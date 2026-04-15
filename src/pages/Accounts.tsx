@@ -45,19 +45,21 @@ export default function Accounts() {
 }
 
 function PubkyAccountCard() {
-  const connected = hasPersisted()
-  const pubkyId = getPersistedPubkyId()
+  const [isConnected, setIsConnected] = useState(hasPersisted())
+  const [connectedId, setConnectedId] = useState(getPersistedPubkyId())
 
   const handleAuthenticated = (session: Session, id: string) => {
     persistAuthFlowSession(session, id)
-    window.location.reload()
+    setIsConnected(true)
+    setConnectedId(id)
   }
 
   const handleError = (_error: string) => {}
 
   const handleDisconnect = () => {
     clearSession()
-    window.location.reload()
+    setIsConnected(false)
+    setConnectedId(null)
   }
 
   return (
@@ -67,16 +69,16 @@ function PubkyAccountCard() {
         <h3 className="text-lg font-semibold text-zinc-100">Pubky</h3>
       </div>
 
-      {connected ? (
+      {isConnected ? (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-success" />
             <span className="text-sm text-zinc-300 font-mono">
-              {pubkyId ? pubkyId.slice(0, 16) + '...' : 'Connected'}
+              {connectedId ? connectedId.slice(0, 16) + '...' : 'Connected'}
             </span>
           </div>
           <p className="text-xs text-zinc-500">
-            Posts from Compose are saved to your homeserver.
+            Posts from Compose are saved to your homeserver. Session lasts until you close or refresh this tab.
           </p>
           <button
             onClick={handleDisconnect}

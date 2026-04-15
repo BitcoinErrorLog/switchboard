@@ -1,5 +1,8 @@
+import { useEffect } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { useAccountsStore } from '@/stores/accounts'
+import { loadSecretKeyFromHex } from '@/adapters/nostr/signer'
 
 const NAV_LINKS = [
   { to: '/reader', label: 'Feed' },
@@ -9,6 +12,14 @@ const NAV_LINKS = [
 
 export default function App() {
   const location = useLocation()
+  const nostrAccount = useAccountsStore((s) => s.accounts.get('nostr'))
+
+  useEffect(() => {
+    const hexSecret = nostrAccount?.sessionData?.secretKeyHex as string | undefined
+    if (hexSecret) {
+      loadSecretKeyFromHex(hexSecret)
+    }
+  }, [nostrAccount?.sessionData?.secretKeyHex])
 
   return (
     <ErrorBoundary>

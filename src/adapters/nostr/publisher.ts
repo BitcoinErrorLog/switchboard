@@ -1,24 +1,24 @@
 import { publishEvent } from './client'
-import type { NostrEvent } from './types'
+import { signEvent, canSign } from './signer'
 
 export async function publishAnnouncement(
   content: string,
   writeRelays?: string[],
 ): Promise<{ success: boolean; eventId: string | null }> {
-  if (!window.nostr) {
+  if (!canSign()) {
     return { success: false, eventId: null }
   }
 
-  const unsigned = {
+  const template = {
     kind: 1,
     created_at: Math.floor(Date.now() / 1000),
-    tags: [],
+    tags: [] as string[][],
     content,
   }
 
-  let signed: NostrEvent
+  let signed
   try {
-    signed = await window.nostr.signEvent(unsigned)
+    signed = await signEvent(template)
   } catch {
     return { success: false, eventId: null }
   }
@@ -38,7 +38,7 @@ export async function publishReply(
   rootEventId?: string,
   writeRelays?: string[],
 ): Promise<{ success: boolean; eventId: string | null }> {
-  if (!window.nostr) {
+  if (!canSign()) {
     return { success: false, eventId: null }
   }
 
@@ -52,16 +52,16 @@ export async function publishReply(
   }
   tags.push(['p', replyToAuthorPubkey])
 
-  const unsigned = {
+  const template = {
     kind: 1,
     created_at: Math.floor(Date.now() / 1000),
     tags,
     content,
   }
 
-  let signed: NostrEvent
+  let signed
   try {
-    signed = await window.nostr.signEvent(unsigned)
+    signed = await signEvent(template)
   } catch {
     return { success: false, eventId: null }
   }

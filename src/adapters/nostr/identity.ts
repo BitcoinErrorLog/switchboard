@@ -1,5 +1,6 @@
 import * as nip19 from 'nostr-tools/nip19'
 import { SimplePool } from 'nostr-tools/pool'
+import { getPublicKey as getNostrPublicKey } from 'nostr-tools/pure'
 import { BOOTSTRAP_RELAYS, RELAY_TIMEOUT_MS, parseRelayListEvent, getReadRelays } from './relays'
 
 export interface DecodedIdentity {
@@ -68,6 +69,17 @@ export async function verifyOwnershipViaNip07(hexPubkey: string): Promise<{
     return { verified: true, proof: signedEvent.sig }
   }
 
+  return { verified: false, proof: null }
+}
+
+export function verifyOwnershipWithSecretKey(
+  hexPubkey: string,
+  secretKey: Uint8Array,
+): { verified: boolean; proof: string | null } {
+  const derivedPubkey = getNostrPublicKey(secretKey)
+  if (derivedPubkey === hexPubkey) {
+    return { verified: true, proof: 'secret_key_derivation' }
+  }
   return { verified: false, proof: null }
 }
 

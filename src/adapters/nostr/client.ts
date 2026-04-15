@@ -1,5 +1,6 @@
 import { SimplePool } from 'nostr-tools/pool'
 import type { Event } from 'nostr-tools/core'
+import type { SubCloser } from 'nostr-tools/abstract-pool'
 import { BOOTSTRAP_RELAYS, RELAY_TIMEOUT_MS, parseRelayListEvent, getReadRelays } from './relays'
 
 let pool: SimplePool | null = null
@@ -87,4 +88,45 @@ export async function publishEvent(
 
   const results = p.publish(relays, event)
   await Promise.allSettled(results)
+}
+
+export function subscribeToUser(
+  hexPubkey: string,
+  relays: string[],
+  callbacks: {
+    onEvent: (event: Event) => void
+    onEose?: () => void
+  },
+): SubCloser {
+  const p = getPool()
+  const queryRelays = relays.length > 0 ? relays : BOOTSTRAP_RELAYS
+
+  return p.subscribeMany(
+    queryRelays,
+    { authors: [hexPubkey], kinds: [0, 1, 3] },
+    {
+      onevent: callbacks.onEvent,
+      oneose: callbacks.onEose,
+    },
+  )
+}
+
+export async function queryFeed(
+  hexPubkey: string,
+  relays: string[],
+  options: { limit?: number; until?: number },
+): Promise<Event[]> {
+  const p = getPool()
+  const queryRelays = relays.length > 0 ? relays : BOOTSTRAP_RELAYS
+
+  const filter: Record<string, unknown> = {
+    authors: [hexPubkey],
+    kinds: [1],
+    limit: options.limit ?? 50,
+  }
+  if (options.until) {
+    filter.until = options.until
+  }
+
+  return p.querySync(queryRelays, filter as any, { maxWait: RELAY_TIMEOUT_MS })
 }

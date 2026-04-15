@@ -146,7 +146,7 @@ export function mapTagToTag(
   postUri: string,
   pubkyId: string,
 ): MappedTag | null {
-  const sanitized = label.toLowerCase().trim().replace(/[\s,:]/g, '')
+  const sanitized = label.replace(/^#+/, '').toLowerCase().trim().replace(/[\s,:]/g, '')
   if (sanitized.length < 1 || sanitized.length > 20) return null
 
   const builder = new PubkySpecsBuilder(pubkyId)

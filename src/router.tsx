@@ -7,6 +7,9 @@ import Preview from './pages/Preview'
 import Verify from './pages/Verify'
 import Activate from './pages/Activate'
 import Done from './pages/Done'
+import Accounts from './pages/Accounts'
+import Reader from './pages/Reader'
+import Compose from './pages/Compose'
 
 export const router = createBrowserRouter([
   {
@@ -14,6 +17,9 @@ export const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <Home /> },
+      { path: 'accounts', element: <Accounts /> },
+      { path: 'reader', element: <Reader /> },
+      { path: 'compose', element: <Compose /> },
       { path: ':platform', element: <Landing /> },
       { path: ':platform/import', element: <Import /> },
       { path: ':platform/preview', element: <Preview /> },

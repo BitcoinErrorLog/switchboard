@@ -18,7 +18,8 @@ export default function Activate() {
   const canActivate =
     verification.signupCode &&
     verification.homeserverPubky &&
-    importStore.identity
+    importStore.identity &&
+    importStore.identity.verification_state === 'verified'
 
   useEffect(() => {
     if (activation.step === 'complete') {
@@ -146,13 +147,25 @@ export default function Activate() {
   }
 
   if (!canActivate) {
+    const needsOwnershipProof = importStore.identity && importStore.identity.verification_state !== 'verified'
     return (
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center">
-          <p className="text-zinc-400">Complete verification first.</p>
-          <Link to={`/${platform}/verify`} className="mt-4 inline-block text-pubky-light hover:underline">
-            Go to verification
-          </Link>
+          {needsOwnershipProof ? (
+            <>
+              <p className="text-zinc-400">You must verify ownership of this account before creating a Pubky account with its data.</p>
+              <Link to={`/${platform}/import`} className="mt-4 inline-block text-pubky-light hover:underline">
+                Verify ownership
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="text-zinc-400">Complete verification first.</p>
+              <Link to={`/${platform}/verify`} className="mt-4 inline-block text-pubky-light hover:underline">
+                Go to verification
+              </Link>
+            </>
+          )}
         </div>
       </div>
     )

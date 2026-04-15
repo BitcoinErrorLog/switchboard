@@ -68,12 +68,40 @@ export interface GraphResult {
 export interface PublishInput {
   content: string
   identity: SwitchboardIdentity
+  reply_to?: {
+    external_id: string
+    platform: PlatformId
+  }
 }
 
 export interface PublishResult {
   success: boolean
   external_id: string | null
   url: string | null
+}
+
+export interface SubscribeInput {
+  identity: SwitchboardIdentity
+  onObject?: (object: SwitchboardObject) => void
+  onEdge?: (edge: SwitchboardEdge) => void
+  onSignal?: (signal: SwitchboardSignal) => void
+  onEose?: () => void
+}
+
+export interface Subscription {
+  close(): void
+}
+
+export interface FeedInput {
+  identity: SwitchboardIdentity
+  cursor?: string | null
+  limit?: number
+}
+
+export interface FeedResult {
+  objects: SwitchboardObject[]
+  cursor: string | null
+  has_more: boolean
 }
 
 export interface BridgeAdapter {
@@ -85,4 +113,7 @@ export interface BridgeAdapter {
   backfill(input: BackfillInput): Promise<BackfillJobResult>
   fetchGraph?(input: GraphFetchInput): Promise<GraphResult>
   publish(input: PublishInput): Promise<PublishResult>
+  subscribe?(input: SubscribeInput): Subscription
+  fetchFeed?(input: FeedInput): Promise<FeedResult>
+  disconnect?(): void
 }

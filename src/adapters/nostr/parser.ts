@@ -102,7 +102,8 @@ function extractHashtags(tags: string[][]): string[] {
   const result: string[] = []
   for (const tag of tags) {
     if (tag[0] === 't' && tag[1]) {
-      result.push(tag[1].toLowerCase())
+      const cleaned = tag[1].replace(/^#+/, '').toLowerCase()
+      if (cleaned.length > 0) result.push(cleaned)
     }
   }
   return result

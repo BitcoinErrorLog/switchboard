@@ -1,4 +1,6 @@
 import * as nip19 from 'nostr-tools/nip19'
+import { SimplePool } from 'nostr-tools/pool'
+import { BOOTSTRAP_RELAYS, RELAY_TIMEOUT_MS, parseRelayListEvent, getReadRelays } from './relays'
 
 export interface DecodedIdentity {
   hexPubkey: string
@@ -67,4 +69,39 @@ export async function verifyOwnershipViaNip07(hexPubkey: string): Promise<{
   }
 
   return { verified: false, proof: null }
+}
+
+export function generateVerificationCode(): string {
+  const rand = crypto.randomUUID().replace(/-/g, '').slice(0, 12)
+  return `switchboard-verify-${rand}`
+}
+
+export async function checkVerificationPost(
+  hexPubkey: string,
+  code: string,
+): Promise<boolean> {
+  const pool = new SimplePool()
+  try {
+    const relayListEvent = await pool.get(BOOTSTRAP_RELAYS, {
+      authors: [hexPubkey],
+      kinds: [10002],
+    }, { maxWait: RELAY_TIMEOUT_MS })
+
+    let queryRelays = BOOTSTRAP_RELAYS
+    if (relayListEvent) {
+      const infos = parseRelayListEvent(relayListEvent.tags)
+      const readRelays = getReadRelays(infos)
+      if (readRelays.length > 0) queryRelays = readRelays
+    }
+
+    const events = await pool.querySync(queryRelays, {
+      authors: [hexPubkey],
+      kinds: [1],
+      limit: 20,
+    }, { maxWait: RELAY_TIMEOUT_MS })
+
+    return events.some((e) => e.content.includes(code))
+  } finally {
+    pool.destroy()
+  }
 }

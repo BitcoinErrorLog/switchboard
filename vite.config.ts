@@ -28,8 +28,15 @@ export default defineConfig({
           'pubky-sdk': ['@synonymdev/pubky'],
           'pubky-specs': ['pubky-app-specs'],
           'nostr-tools': ['nostr-tools'],
+          'atproto': ['@atproto/api'],
         },
       },
     },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test-setup.ts'],
+    exclude: ['**/._*', '**/node_modules/**', '**/dist/**'],
   },
 })

@@ -21,7 +21,7 @@ export default function Import() {
   }, [platform])
 
   useEffect(() => {
-    if (store.identity && store.step === 'identifying') {
+    if (store.identity && store.identity.verification_state === 'verified' && store.step === 'identifying') {
       handleBackfill()
     }
   }, [store.identity, store.step])

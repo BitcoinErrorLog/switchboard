@@ -11,14 +11,18 @@ import type {
   GraphResult,
   PublishInput,
   PublishResult,
+  SubscribeInput,
+  Subscription,
+  FeedInput,
+  FeedResult,
 } from '@/core/adapter'
 import type { PlatformId } from '@/core/types'
 import { decodeNostrIdentifier } from './identity'
 import { verifyOwnershipViaNip07 } from './identity'
-import { fetchUserData } from './client'
+import { fetchUserData, destroyPool, subscribeToUser, queryFeed, fetchRelayList } from './client'
 import { parseProfile, parseNotes, parseFollows, extractTagFrequencies } from './parser'
-import { parseRelayListEvent, getWriteRelays } from './relays'
-import { publishAnnouncement } from './publisher'
+import { parseRelayListEvent, getWriteRelays, getReadRelays } from './relays'
+import { publishAnnouncement, publishReply } from './publisher'
 
 export class NostrAdapter implements BridgeAdapter {
   platform(): PlatformId {
@@ -30,9 +34,9 @@ export class NostrAdapter implements BridgeAdapter {
       claim_identity: true,
       verify_ownership: true,
       archive_import: false,
-      live_sync: false,
+      live_sync: true,
       publish: true,
-      reply_publish: false,
+      reply_publish: true,
       delete_publish: false,
       graph_import: true,
       media_import: false,
@@ -139,11 +143,105 @@ export class NostrAdapter implements BridgeAdapter {
       writeRelays = getWriteRelays(infos)
     }
 
+    if (input.reply_to && input.reply_to.platform === 'nostr') {
+      const result = await publishReply(
+        input.content,
+        input.reply_to.external_id,
+        input.identity.external_id,
+        undefined,
+        writeRelays,
+      )
+      return {
+        success: result.success,
+        external_id: result.eventId,
+        url: result.eventId ? `https://njump.me/${result.eventId}` : null,
+      }
+    }
+
     const result = await publishAnnouncement(input.content, writeRelays)
     return {
       success: result.success,
       external_id: result.eventId,
       url: result.eventId ? `https://njump.me/${result.eventId}` : null,
     }
+  }
+
+  subscribe(input: SubscribeInput): Subscription {
+    const hexPubkey = input.identity.external_id
+    let relays: string[] = []
+
+    const setup = async () => {
+      const relayListEvent = await fetchRelayList(hexPubkey)
+      if (relayListEvent) {
+        const infos = parseRelayListEvent(relayListEvent.tags)
+        relays = getReadRelays(infos)
+      }
+
+      return subscribeToUser(hexPubkey, relays, {
+        onEvent: (event) => {
+          if (event.kind === 1) {
+            const objects = parseNotes([event])
+            for (const obj of objects) {
+              input.onObject?.(obj)
+            }
+          } else if (event.kind === 3) {
+            const edges = parseFollows(event, hexPubkey)
+            for (const edge of edges) {
+              input.onEdge?.(edge)
+            }
+          }
+        },
+        onEose: input.onEose,
+      })
+    }
+
+    let closer: ReturnType<typeof subscribeToUser> | null = null
+    let closed = false
+
+    setup().then((c) => {
+      if (closed) {
+        c.close()
+      } else {
+        closer = c
+      }
+    })
+
+    return {
+      close() {
+        closed = true
+        closer?.close()
+      },
+    }
+  }
+
+  async fetchFeed(input: FeedInput): Promise<FeedResult> {
+    const hexPubkey = input.identity.external_id
+    const relayListEvent = await fetchRelayList(hexPubkey)
+    let relays: string[] = []
+    if (relayListEvent) {
+      const infos = parseRelayListEvent(relayListEvent.tags)
+      relays = getReadRelays(infos)
+    }
+
+    const until = input.cursor ? parseInt(input.cursor, 10) : undefined
+    const events = await queryFeed(hexPubkey, relays, {
+      limit: input.limit ?? 50,
+      until,
+    })
+
+    const objects = parseNotes(events)
+
+    const lastEvent = events[events.length - 1]
+    const cursor = lastEvent ? String(lastEvent.created_at) : null
+
+    return {
+      objects,
+      cursor,
+      has_more: events.length === (input.limit ?? 50),
+    }
+  }
+
+  disconnect(): void {
+    destroyPool()
   }
 }

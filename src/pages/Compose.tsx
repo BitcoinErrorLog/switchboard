@@ -2,9 +2,9 @@ import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useComposerStore, PLATFORM_CHAR_LIMITS, PUBKY_SHORT_LIMIT } from '@/stores/composer'
 import { useAccountsStore } from '@/stores/accounts'
-import { useActivationStore } from '@/stores/activation'
 import { getPlatformConfig } from '@/platforms'
 import { writeJson } from '@/lib/pubky'
+import { getSession } from '@/lib/pubky-session'
 import { mapObjectToPost } from '@/core/mapper'
 import type { PlatformId, SwitchboardObject } from '@/core/types'
 
@@ -16,7 +16,6 @@ const PLATFORM_ICONS: Record<string, string> = {
 export default function Compose() {
   const composer = useComposerStore()
   const { accounts } = useAccountsStore()
-  const activation = useActivationStore()
 
   const linkedPlatforms = Array.from(accounts.values())
     .filter((a) => a.connected)
@@ -45,12 +44,13 @@ export default function Compose() {
 
     const now = Math.floor(Date.now() / 1000)
 
-    if (activation.session && activation.pubkyId) {
+    const pubkySession = await getSession()
+    if (pubkySession) {
       const canonical: SwitchboardObject = {
         platform: 'nostr' as PlatformId,
         external_id: '',
         canonical_object_id: `pubky:${Date.now()}`,
-        author_identity_ref: activation.pubkyId,
+        author_identity_ref: pubkySession.pubkyId,
         kind: 'note',
         body: composer.content,
         media_refs: [],
@@ -65,11 +65,11 @@ export default function Compose() {
         source_payload_ref: '',
       }
 
-      const mapped = mapObjectToPost(canonical, activation.pubkyId)
+      const mapped = mapObjectToPost(canonical, pubkySession.pubkyId)
       if (mapped) {
         try {
           await writeJson(
-            activation.session,
+            pubkySession.session,
             mapped.path as `/pub/${string}`,
             mapped.json,
           )

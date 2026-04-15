@@ -8,6 +8,7 @@ import { mapIdentityToUser, mapObjectToPost, mapEdgeToFollow, mapTagToTag } from
 import { lookupPubkyId, registerLink } from '@/lib/identity-links'
 import ActivationProgress from '@/components/ActivationProgress'
 import PubkyAuth from '@/components/PubkyAuth'
+import { persistMnemonicSession, persistAuthFlowSession, setCachedSession } from '@/lib/pubky-session'
 import type { Session } from '@synonymdev/pubky'
 import type { SwitchboardIdentity, SwitchboardObject, SwitchboardEdge } from '@/core/types'
 
@@ -151,6 +152,7 @@ function ExistingAccountFlow({ platform, identity, objects, edges }: FlowProps) 
     activation.setExistingSession(session, pubkyId)
     activation.setStep('choosing_merge')
 
+    persistAuthFlowSession(session, pubkyId)
     registerLink(identity.platform, identity.external_id, pubkyId)
   }
 
@@ -351,6 +353,8 @@ function NewAccountFlow({
         verification.signupCode!,
       )
       activation.setSession(session)
+      persistMnemonicSession(activation.mnemonic, pubkyId)
+      setCachedSession(session, pubkyId)
     } catch (err) {
       activation.setError(
         err instanceof Error ? err.message : 'Signup failed',

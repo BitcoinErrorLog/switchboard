@@ -1,21 +1,28 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useComposerStore, PLATFORM_CHAR_LIMITS, PUBKY_SHORT_LIMIT } from '@/stores/composer'
 import { useAccountsStore } from '@/stores/accounts'
 import { getPlatformConfig } from '@/platforms'
 import { writeJson } from '@/lib/pubky'
 import { getSession } from '@/lib/pubky-session'
+import { hasPersisted } from '@/lib/pubky-session'
 import { mapObjectToPost } from '@/core/mapper'
 import type { PlatformId, SwitchboardObject } from '@/core/types'
 
 const PLATFORM_ICONS: Record<string, string> = {
   nostr: '⚡',
   bluesky: '🦋',
+  pubky: '🔑',
 }
+
+type PubkyStatus = 'idle' | 'publishing' | 'success' | 'error' | 'skipped'
 
 export default function Compose() {
   const composer = useComposerStore()
   const { accounts } = useAccountsStore()
+  const [pubkyStatus, setPubkyStatus] = useState<PubkyStatus>('idle')
+  const [pubkyError, setPubkyError] = useState<string | null>(null)
+  const hasPubky = hasPersisted()
 
   const linkedPlatforms = Array.from(accounts.values())
     .filter((a) => a.connected)
@@ -30,52 +37,63 @@ export default function Compose() {
   const minLimit = getMinCharLimit(composer.targets)
   const overLimit = graphemeCount > minLimit
 
-  const allDone = linkedPlatforms.length > 0 &&
+  const externalDone = linkedPlatforms.length > 0 &&
     Array.from(composer.targets).every(
       (p) => composer.status.get(p) === 'success',
     )
+  const pubkyDone = !hasPubky || pubkyStatus === 'success' || pubkyStatus === 'skipped'
+  const allDone = externalDone && pubkyDone
 
   const isPublishing = Array.from(composer.status.values()).some(
     (s) => s === 'publishing',
-  )
+  ) || pubkyStatus === 'publishing'
 
   const handlePublish = async () => {
     if (!composer.content.trim() || overLimit) return
 
     const now = Math.floor(Date.now() / 1000)
 
-    const pubkySession = await getSession()
-    if (pubkySession) {
-      const canonical: SwitchboardObject = {
-        platform: 'nostr' as PlatformId,
-        external_id: '',
-        canonical_object_id: `pubky:${Date.now()}`,
-        author_identity_ref: pubkySession.pubkyId,
-        kind: 'note',
-        body: composer.content,
-        media_refs: [],
-        canonical_url: null,
-        created_at: now,
-        updated_at: now,
-        visibility: 'public',
-        reply_to: null,
-        quote_of: null,
-        repost_of: null,
-        tags: [],
-        source_payload_ref: '',
-      }
+    if (hasPubky) {
+      setPubkyStatus('publishing')
+      setPubkyError(null)
+      try {
+        const pubkySession = await getSession()
+        if (pubkySession) {
+          const canonical: SwitchboardObject = {
+            platform: 'nostr' as PlatformId,
+            external_id: '',
+            canonical_object_id: `pubky:${Date.now()}`,
+            author_identity_ref: pubkySession.pubkyId,
+            kind: 'note',
+            body: composer.content,
+            media_refs: [],
+            canonical_url: null,
+            created_at: now,
+            updated_at: now,
+            visibility: 'public',
+            reply_to: null,
+            quote_of: null,
+            repost_of: null,
+            tags: [],
+            source_payload_ref: '',
+          }
 
-      const mapped = mapObjectToPost(canonical, pubkySession.pubkyId)
-      if (mapped) {
-        try {
-          await writeJson(
-            pubkySession.session,
-            mapped.path as `/pub/${string}`,
-            mapped.json,
-          )
-        } catch {
-          // pubky write failure doesn't block external publishes
+          const mapped = mapObjectToPost(canonical, pubkySession.pubkyId)
+          if (mapped) {
+            await writeJson(
+              pubkySession.session,
+              mapped.path as `/pub/${string}`,
+              mapped.json,
+            )
+          }
+          setPubkyStatus('success')
+        } else {
+          setPubkyStatus('error')
+          setPubkyError('Session expired — re-activate your Pubky account')
         }
+      } catch (err) {
+        setPubkyStatus('error')
+        setPubkyError(err instanceof Error ? err.message : 'Pubky write failed')
       }
     }
 
@@ -173,8 +191,22 @@ export default function Compose() {
           </button>
         </div>
 
-        {(composer.status.size > 0) && (
+        {(composer.status.size > 0 || pubkyStatus !== 'idle') && (
           <div className="mt-6 space-y-2">
+            {hasPubky && pubkyStatus !== 'idle' && (
+              <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
+                <span className="text-sm">{PLATFORM_ICONS.pubky}</span>
+                {pubkyStatus === 'publishing' && (
+                  <span className="text-sm text-zinc-400">Publishing to homeserver...</span>
+                )}
+                {pubkyStatus === 'success' && (
+                  <span className="text-sm text-success">Saved to Pubky homeserver</span>
+                )}
+                {pubkyStatus === 'error' && (
+                  <span className="text-sm text-error">{pubkyError || 'Failed'}</span>
+                )}
+              </div>
+            )}
             {Array.from(composer.targets).map((p) => {
               const status = composer.status.get(p)
               const error = composer.errors.get(p)
@@ -216,7 +248,11 @@ export default function Compose() {
         {allDone && (
           <div className="mt-6 text-center">
             <button
-              onClick={() => composer.reset()}
+              onClick={() => {
+                composer.reset()
+                setPubkyStatus('idle')
+                setPubkyError(null)
+              }}
               className="rounded-lg border border-zinc-700 px-6 py-2.5 text-sm text-zinc-300 hover:border-zinc-600"
             >
               Compose Another

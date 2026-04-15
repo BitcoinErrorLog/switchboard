@@ -6,8 +6,9 @@ import { hasNip07Extension, getNip07PublicKey, verifyOwnershipWithSecretKey } fr
 import { decodeNsec, setSecretKey, secretKeyToHex, clearSecretKey } from '@/adapters/nostr/signer'
 import { login as blueskyLogin, getSessionData as getBlueskySession } from '@/adapters/bluesky/client'
 import { parseProfile as parseBlueskyProfile } from '@/adapters/bluesky/parser'
-import { keypairFromMnemonic, getPubky, getPublicKey } from '@/lib/pubky'
-import { persistMnemonicSession, clearSession, hasPersisted, getPersistedPubkyId } from '@/lib/pubky-session'
+import { persistAuthFlowSession, clearSession, hasPersisted, getPersistedPubkyId } from '@/lib/pubky-session'
+import PubkyAuth from '@/components/PubkyAuth'
+import type { Session } from '@synonymdev/pubky'
 
 export default function Accounts() {
   const { accounts, linkAccount, unlinkAccount } = useAccountsStore()
@@ -44,32 +45,15 @@ export default function Accounts() {
 }
 
 function PubkyAccountCard() {
-  const [mnemonicInput, setMnemonicInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const connected = hasPersisted()
   const pubkyId = getPersistedPubkyId()
 
-  const handleConnect = async () => {
-    const trimmed = mnemonicInput.trim()
-    if (!trimmed) return
-    setLoading(true)
-    setError(null)
-    try {
-      const { keypair, pubkyId: id } = keypairFromMnemonic(trimmed)
-      const pubky = getPubky()
-      const signer = pubky.signer(keypair)
-      const session = await signer.signin()
-      const resolvedId = getPublicKey(session)
-
-      persistMnemonicSession(trimmed, resolvedId)
-      setMnemonicInput('')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign in')
-    } finally {
-      setLoading(false)
-    }
+  const handleAuthenticated = (session: Session, id: string) => {
+    persistAuthFlowSession(session, id)
+    window.location.reload()
   }
+
+  const handleError = (_error: string) => {}
 
   const handleDisconnect = () => {
     clearSession()
@@ -102,28 +86,10 @@ function PubkyAccountCard() {
           </button>
         </div>
       ) : (
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-zinc-300">Recovery phrase</label>
-          <textarea
-            placeholder="Enter your 24-word recovery phrase"
-            value={mnemonicInput}
-            onChange={(e) => setMnemonicInput(e.target.value)}
-            disabled={loading}
-            rows={3}
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-pubky focus:outline-none disabled:opacity-50 font-mono resize-none"
-          />
-          <p className="text-xs text-zinc-600">
-            Your phrase stays in this browser. Never shared with any server.
-          </p>
-          <button
-            onClick={handleConnect}
-            disabled={loading || !mnemonicInput.trim()}
-            className="w-full rounded-lg border border-pubky/50 bg-pubky/10 px-4 py-2.5 text-sm font-semibold text-pubky-light hover:bg-pubky/20 disabled:opacity-50"
-          >
-            {loading ? 'Signing in...' : 'Connect Pubky'}
-          </button>
-          {error && <p className="text-xs text-error">{error}</p>}
-        </div>
+        <PubkyAuth
+          onAuthenticated={handleAuthenticated}
+          onError={handleError}
+        />
       )}
     </div>
   )

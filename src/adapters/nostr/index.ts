@@ -25,8 +25,27 @@ import { parseRelayListEvent, getWriteRelays, getReadRelays } from './relays'
 import { publishAnnouncement, publishReply } from './publisher'
 
 export class NostrAdapter implements BridgeAdapter {
+  private writeRelayCache: Map<string, { relays: string[]; fetchedAt: number }> = new Map()
+  private static RELAY_CACHE_TTL = 5 * 60 * 1000
+
   platform(): PlatformId {
     return 'nostr'
+  }
+
+  private async getWriteRelaysForUser(hexPubkey: string): Promise<string[] | undefined> {
+    const cached = this.writeRelayCache.get(hexPubkey)
+    if (cached && Date.now() - cached.fetchedAt < NostrAdapter.RELAY_CACHE_TTL) {
+      return cached.relays.length > 0 ? cached.relays : undefined
+    }
+
+    const relayListEvent = await fetchRelayList(hexPubkey)
+    let relays: string[] = []
+    if (relayListEvent) {
+      const infos = parseRelayListEvent(relayListEvent.tags)
+      relays = getWriteRelays(infos)
+    }
+    this.writeRelayCache.set(hexPubkey, { relays, fetchedAt: Date.now() })
+    return relays.length > 0 ? relays : undefined
   }
 
   capabilities(): CapabilityManifest {
@@ -136,12 +155,7 @@ export class NostrAdapter implements BridgeAdapter {
   }
 
   async publish(input: PublishInput): Promise<PublishResult> {
-    const data = await fetchUserData(input.identity.external_id, 0)
-    let writeRelays: string[] | undefined
-    if (data.relayList) {
-      const infos = parseRelayListEvent(data.relayList.tags)
-      writeRelays = getWriteRelays(infos)
-    }
+    const writeRelays = await this.getWriteRelaysForUser(input.identity.external_id)
 
     if (input.reply_to && input.reply_to.platform === 'nostr') {
       const result = await publishReply(

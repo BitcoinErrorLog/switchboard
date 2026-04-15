@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { useAccountsStore } from '@/stores/accounts'
 import { loadSecretKeyFromHex } from '@/adapters/nostr/signer'
+import { resumeSession as resumeBlueskySession } from '@/adapters/bluesky/client'
 
 const NAV_LINKS = [
   { to: '/reader', label: 'Feed' },
@@ -13,6 +14,7 @@ const NAV_LINKS = [
 export default function App() {
   const location = useLocation()
   const nostrAccount = useAccountsStore((s) => s.accounts.get('nostr'))
+  const blueskyAccount = useAccountsStore((s) => s.accounts.get('bluesky'))
 
   useEffect(() => {
     const hexSecret = nostrAccount?.sessionData?.secretKeyHex as string | undefined
@@ -20,6 +22,18 @@ export default function App() {
       loadSecretKeyFromHex(hexSecret)
     }
   }, [nostrAccount?.sessionData?.secretKeyHex])
+
+  useEffect(() => {
+    const sd = blueskyAccount?.sessionData
+    if (sd?.accessJwt && sd?.refreshJwt && sd?.handle && sd?.did) {
+      resumeBlueskySession({
+        accessJwt: sd.accessJwt as string,
+        refreshJwt: sd.refreshJwt as string,
+        handle: sd.handle as string,
+        did: sd.did as string,
+      }).catch(() => {})
+    }
+  }, [blueskyAccount?.sessionData?.did])
 
   return (
     <ErrorBoundary>

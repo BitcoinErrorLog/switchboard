@@ -61,6 +61,13 @@ export default function Import() {
   }
 
   const IdentifyComponent = config.IdentifyComponent
+  if (!IdentifyComponent) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <p className="text-zinc-400">Loading...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-1 flex-col items-center px-4 py-12">

@@ -8,8 +8,8 @@ export interface PlatformConfig {
   slug: PlatformId
   name: string
   adapter: BridgeAdapter
-  IdentifyComponent: ComponentType
-  AnnounceComponent: ComponentType
+  IdentifyComponent: ComponentType | null
+  AnnounceComponent: ComponentType | null
   landingCopy: {
     headline: string
     subhead: string
@@ -47,51 +47,71 @@ export const COMING_SOON_PLATFORMS: Array<{
   },
 ]
 
-let platformRegistry: Map<PlatformId, PlatformConfig> | null = null
+const platformRegistry = new Map<PlatformId, PlatformConfig>()
+
+platformRegistry.set('nostr', {
+  slug: 'nostr',
+  name: 'Nostr',
+  adapter: new NostrAdapter(),
+  IdentifyComponent: null,
+  AnnounceComponent: null,
+  landingCopy: {
+    headline: 'Bring Your Nostr to Pubky',
+    subhead: 'Your profile. Your people. Your posts. Imported in seconds.',
+    cta: 'Import My Nostr',
+  },
+  icon: '⚡',
+  available: true,
+})
+
+platformRegistry.set('bluesky', {
+  slug: 'bluesky',
+  name: 'Bluesky',
+  adapter: new BlueskyAdapter(),
+  IdentifyComponent: null,
+  AnnounceComponent: null,
+  landingCopy: {
+    headline: 'Bring Your Bluesky to Pubky',
+    subhead: 'Your posts. Your follows. Your feed. Owned by you.',
+    cta: 'Import My Bluesky',
+  },
+  icon: '🦋',
+  available: true,
+})
 
 export async function getPlatformRegistry(): Promise<Map<PlatformId, PlatformConfig>> {
-  if (platformRegistry) return platformRegistry
-
-  const { default: IdentifyNostr } = await import('@/components/nostr/IdentifyNostr')
-  const { default: AnnounceNostr } = await import('@/components/nostr/AnnounceNostr')
-  const { default: IdentifyBluesky } = await import('@/components/bluesky/IdentifyBluesky')
-  const { default: AnnounceBluesky } = await import('@/components/bluesky/AnnounceBluesky')
-
-  platformRegistry = new Map()
-
-  platformRegistry.set('nostr', {
-    slug: 'nostr',
-    name: 'Nostr',
-    adapter: new NostrAdapter(),
-    IdentifyComponent: IdentifyNostr,
-    AnnounceComponent: AnnounceNostr,
-    landingCopy: {
-      headline: 'Bring Your Nostr to Pubky',
-      subhead: 'Your profile. Your people. Your posts. Imported in seconds.',
-      cta: 'Import My Nostr',
-    },
-    icon: '⚡',
-    available: true,
-  })
-
-  platformRegistry.set('bluesky', {
-    slug: 'bluesky',
-    name: 'Bluesky',
-    adapter: new BlueskyAdapter(),
-    IdentifyComponent: IdentifyBluesky,
-    AnnounceComponent: AnnounceBluesky,
-    landingCopy: {
-      headline: 'Bring Your Bluesky to Pubky',
-      subhead: 'Your posts. Your follows. Your feed. Owned by you.',
-      cta: 'Import My Bluesky',
-    },
-    icon: '🦋',
-    available: true,
-  })
-
+  await ensureComponents()
   return platformRegistry
 }
 
+let componentsLoaded = false
+
+async function ensureComponents(): Promise<void> {
+  if (componentsLoaded) return
+
+  const [
+    { default: IdentifyNostr },
+    { default: AnnounceNostr },
+    { default: IdentifyBluesky },
+    { default: AnnounceBluesky },
+  ] = await Promise.all([
+    import('@/components/nostr/IdentifyNostr'),
+    import('@/components/nostr/AnnounceNostr'),
+    import('@/components/bluesky/IdentifyBluesky'),
+    import('@/components/bluesky/AnnounceBluesky'),
+  ])
+
+  const nostr = platformRegistry.get('nostr')!
+  nostr.IdentifyComponent = IdentifyNostr
+  nostr.AnnounceComponent = AnnounceNostr
+
+  const bluesky = platformRegistry.get('bluesky')!
+  bluesky.IdentifyComponent = IdentifyBluesky
+  bluesky.AnnounceComponent = AnnounceBluesky
+
+  componentsLoaded = true
+}
+
 export function getPlatformConfig(slug: PlatformId): PlatformConfig | undefined {
-  return platformRegistry?.get(slug)
+  return platformRegistry.get(slug)
 }

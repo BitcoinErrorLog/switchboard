@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccountsStore, type LinkedAccount } from '@/stores/accounts'
-import { NostrAdapter } from '@/adapters/nostr'
+import { getPlatformConfig } from '@/platforms'
 import { hasNip07Extension, getNip07PublicKey } from '@/adapters/nostr/identity'
 import { login as blueskyLogin, getSessionData as getBlueskySession } from '@/adapters/bluesky/client'
 import { parseProfile as parseBlueskyProfile } from '@/adapters/bluesky/parser'
@@ -51,12 +51,6 @@ function NostrAccountCard({
 }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const adapterRef = useRef<NostrAdapter | null>(null)
-
-  const getAdapter = () => {
-    if (!adapterRef.current) adapterRef.current = new NostrAdapter()
-    return adapterRef.current
-  }
 
   const handleConnect = async () => {
     if (!hasNip07Extension()) {
@@ -67,10 +61,11 @@ function NostrAccountCard({
     setError(null)
     try {
       const hexPubkey = await getNip07PublicKey()
-      const adapter = getAdapter()
+      const config = getPlatformConfig('nostr')
+      if (!config) throw new Error('Nostr platform not available')
 
-      const result = await adapter.claimIdentity({ raw_identifier: hexPubkey })
-      const verifyResult = await adapter.verifyOwnership({ identity: result.identity })
+      const result = await config.adapter.claimIdentity({ raw_identifier: hexPubkey })
+      const verifyResult = await config.adapter.verifyOwnership({ identity: result.identity })
 
       if (!verifyResult.verified) throw new Error('Verification failed')
 

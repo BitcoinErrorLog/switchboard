@@ -46,15 +46,15 @@ function makeMockSession() {
 describe('pubky-session', () => {
   beforeEach(() => {
     clearSession()
-    sessionStorage.clear()
+    localStorage.clear()
     vi.clearAllMocks()
   })
 
   describe('persistMnemonicSession', () => {
-    it('stores mnemonic in sessionStorage', () => {
+    it('stores mnemonic in localStorage', () => {
       persistMnemonicSession('test mnemonic words', 'pk1abc')
 
-      const stored = JSON.parse(sessionStorage.getItem('switchboard_pubky_session')!)
+      const stored = JSON.parse(localStorage.getItem('switchboard_pubky_credentials')!)
       expect(stored.method).toBe('mnemonic')
       expect(stored.mnemonic).toBe('test mnemonic words')
       expect(stored.pubkyId).toBe('pk1abc')
@@ -118,8 +118,8 @@ describe('pubky-session', () => {
     })
 
     it('returns null for authflow-only persistence without cache', async () => {
-      sessionStorage.setItem(
-        'switchboard_pubky_session',
+      localStorage.setItem(
+        'switchboard_pubky_credentials',
         JSON.stringify({ pubkyId: 'pk1auth', method: 'authflow' }),
       )
 
@@ -155,7 +155,7 @@ describe('pubky-session', () => {
 
       expect(hasPersisted()).toBe(false)
       expect(getPersistedPubkyId()).toBeNull()
-      expect(sessionStorage.getItem('switchboard_pubky_session')).toBeNull()
+      expect(localStorage.getItem('switchboard_pubky_credentials')).toBeNull()
     })
   })
 })

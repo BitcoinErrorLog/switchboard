@@ -2,9 +2,9 @@ import type { Session } from '@synonymdev/pubky'
 import { getPubky, keypairFromMnemonic, getPublicKey } from './pubky'
 import { Keypair } from '@synonymdev/pubky'
 
-const SESSION_KEY = 'switchboard_pubky_session'
+const LOCAL_KEY = 'switchboard_pubky_credentials'
 
-interface PersistedSession {
+interface PersistedCredentials {
   pubkyId: string
   method: 'mnemonic' | 'authflow'
   mnemonic?: string
@@ -14,19 +14,19 @@ interface PersistedSession {
 let cachedSession: Session | null = null
 let cachedPubkyId: string | null = null
 
-function persist(data: PersistedSession) {
+function persist(data: PersistedCredentials) {
   try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(data))
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(data))
   } catch {
-    // sessionStorage unavailable
+    // localStorage unavailable
   }
 }
 
-function load(): PersistedSession | null {
+function load(): PersistedCredentials | null {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY)
+    const raw = localStorage.getItem(LOCAL_KEY)
     if (!raw) return null
-    return JSON.parse(raw) as PersistedSession
+    return JSON.parse(raw) as PersistedCredentials
   } catch {
     return null
   }
@@ -52,6 +52,35 @@ export function setCachedSession(session: Session, pubkyId: string) {
   cachedPubkyId = pubkyId
 }
 
+async function restoreFromCredentials(data: PersistedCredentials): Promise<{ session: Session; pubkyId: string } | null> {
+  try {
+    let keypair: ReturnType<typeof Keypair.fromSecret>
+
+    if (data.mnemonic) {
+      const result = keypairFromMnemonic(data.mnemonic)
+      keypair = result.keypair
+    } else if (data.secret) {
+      const bytes = new Uint8Array(
+        data.secret.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+      )
+      keypair = Keypair.fromSecret(bytes)
+    } else {
+      return null
+    }
+
+    const pubky = getPubky()
+    const signer = pubky.signer(keypair)
+    const session = await signer.signin()
+    const pubkyId = getPublicKey(session)
+
+    cachedSession = session
+    cachedPubkyId = pubkyId
+    return { session, pubkyId }
+  } catch {
+    return null
+  }
+}
+
 export async function getSession(): Promise<{ session: Session; pubkyId: string } | null> {
   if (cachedSession && cachedPubkyId) {
     return { session: cachedSession, pubkyId: cachedPubkyId }
@@ -60,37 +89,10 @@ export async function getSession(): Promise<{ session: Session; pubkyId: string 
   const data = load()
   if (!data) return null
 
-  if (data.method === 'mnemonic') {
-    try {
-      let keypair: ReturnType<typeof Keypair.fromSecret>
-
-      if (data.mnemonic) {
-        const result = keypairFromMnemonic(data.mnemonic)
-        keypair = result.keypair
-      } else if (data.secret) {
-        const bytes = new Uint8Array(
-          data.secret.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
-        )
-        keypair = Keypair.fromSecret(bytes)
-      } else {
-        return null
-      }
-
-      const pubky = getPubky()
-      const signer = pubky.signer(keypair)
-      const session = await signer.signin()
-      const pubkyId = getPublicKey(session)
-
-      cachedSession = session
-      cachedPubkyId = pubkyId
-      return { session, pubkyId }
-    } catch {
-      clearSession()
-      return null
-    }
+  if (data.method === 'mnemonic' || data.mnemonic || data.secret) {
+    return restoreFromCredentials(data)
   }
 
-  // authflow sessions can't be restored from storage — need the in-memory cache
   return null
 }
 
@@ -108,8 +110,8 @@ export function clearSession() {
   cachedSession = null
   cachedPubkyId = null
   try {
-    sessionStorage.removeItem(SESSION_KEY)
+    localStorage.removeItem(LOCAL_KEY)
   } catch {
-    // sessionStorage unavailable
+    // localStorage unavailable
   }
 }
